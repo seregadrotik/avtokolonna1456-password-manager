@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Configuration = "Release"
@@ -7,9 +7,19 @@ param(
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $sln = Join-Path $root "Avtokolonna1456.sln"
-$msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
-    -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe `
-    | Select-Object -First 1
+
+$msbuild = $null
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vswhere) {
+    $msbuild = & $vswhere `
+        -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe `
+        | Select-Object -First 1
+}
+
+if (-not $msbuild) {
+    $cmd = Get-Command msbuild -ErrorAction SilentlyContinue
+    if ($cmd) { $msbuild = $cmd.Source }
+}
 
 if (-not $msbuild) {
     $msbuild = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\MSBuild.exe"

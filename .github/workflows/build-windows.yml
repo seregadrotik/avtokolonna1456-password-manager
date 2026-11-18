@@ -19,11 +19,11 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Install Inno Setup
-        shell: powershell
+        shell: pwsh
         run: choco install innosetup --no-progress -y
 
       - name: Build installer
-        shell: powershell
+        shell: pwsh
         run: .\scripts\make-installer.ps1
 
       - name: Upload installer
@@ -37,6 +37,6 @@ jobs:
         with:
           tag_name: latest
           name: Автоколонна 1456 — последняя версия
-          prerelease: true
+          prerelease: false
           make_latest: true
           files: dist/Avtokolonna1456_Setup.exe

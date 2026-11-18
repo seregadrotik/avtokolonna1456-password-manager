@@ -1,4 +1,4 @@
-; Inno Setup script
+﻿; Inno Setup script
 ; Output: dist\Avtokolonna1456_Setup.exe
 
 #define MyAppName "Автоколонна 1456 — Менеджер паролей"
