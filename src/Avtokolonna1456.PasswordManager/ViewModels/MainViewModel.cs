@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Avtokolonna1456.PasswordManager.Models;
 using Avtokolonna1456.PasswordManager.Services;
 using Avtokolonna1456.PasswordManager.Views;
@@ -20,10 +21,12 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
         private readonly ThemeService _theme;
         private readonly AutostartService _autostart;
         private readonly NotificationService _notifications;
+        private readonly DispatcherTimer _statusTimer;
         private string _searchText = string.Empty;
         private PasswordRowViewModel _selected;
         private bool _darkTheme;
         private bool _autostartEnabled;
+        private string _statusMessage = string.Empty;
 
         public MainViewModel(
             AppData data,
@@ -35,6 +38,11 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             NotificationService notifications)
         {
             Data = data ?? throw new ArgumentNullException(nameof(data));
+            if (Data.Entries == null)
+            {
+                Data.Entries = new System.Collections.Generic.List<PasswordEntry>();
+            }
+
             _storage = storage;
             _backup = backup;
             _clipboard = clipboard;
@@ -42,8 +50,15 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             _autostart = autostart;
             _notifications = notifications;
 
+            _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
+            _statusTimer.Tick += (s, e) =>
+            {
+                _statusTimer.Stop();
+                StatusMessage = string.Empty;
+            };
+
             Rows = new ObservableCollection<PasswordRowViewModel>(
-                data.Entries.Select(e => new PasswordRowViewModel(e)));
+                Data.Entries.Select(e => new PasswordRowViewModel(e)));
             RowsView = CollectionViewSource.GetDefaultView(Rows);
             RowsView.Filter = FilterRow;
             RowsView.SortDescriptions.Add(new SortDescription(nameof(PasswordRowViewModel.DaysRemaining), ListSortDirection.Ascending));
@@ -63,6 +78,7 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             ToggleThemeCommand = new RelayCommand(ToggleTheme);
             ToggleAutostartCommand = new RelayCommand(ToggleAutostart);
             CheckRemindersCommand = new RelayCommand(ShowReminders);
+            ClearSearchCommand = new RelayCommand(() => SearchText = string.Empty);
 
             RefreshStats();
         }
@@ -83,14 +99,17 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
         public ICommand ToggleThemeCommand { get; }
         public ICommand ToggleAutostartCommand { get; }
         public ICommand CheckRemindersCommand { get; }
+        public ICommand ClearSearchCommand { get; }
 
         public PasswordRowViewModel Selected
         {
             get => _selected;
             set
             {
+                if (ReferenceEquals(_selected, value)) return;
                 _selected = value;
                 OnPropertyChanged();
+                CommandManager.InvalidateRequerySuggested();
             }
         }
 
@@ -99,12 +118,17 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             get => _searchText;
             set
             {
-                if (_searchText == value) return;
-                _searchText = value ?? string.Empty;
+                var next = value ?? string.Empty;
+                if (_searchText == next) return;
+                _searchText = next;
                 OnPropertyChanged();
+                OnPropertyChanged(nameof(HasSearchText));
                 RowsView.Refresh();
+                RefreshViewState();
             }
         }
+
+        public bool HasSearchText => !string.IsNullOrWhiteSpace(_searchText);
 
         public bool DarkTheme
         {
@@ -134,10 +158,38 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             }
         }
 
+        public string StatusMessage
+        {
+            get => _statusMessage;
+            private set
+            {
+                if (_statusMessage == value) return;
+                _statusMessage = value ?? string.Empty;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(HasStatusMessage));
+            }
+        }
+
+        public bool HasStatusMessage => !string.IsNullOrEmpty(_statusMessage);
+
         public int TotalCount { get; private set; }
+        public int FilteredCount { get; private set; }
         public int OkCount { get; private set; }
         public int WarningCount { get; private set; }
         public int ExpiredCount { get; private set; }
+
+        public bool ShowNoPasswordsState => TotalCount == 0;
+        public bool ShowNoSearchResultsState => TotalCount > 0 && FilteredCount == 0;
+
+        public string TableHeaderText
+        {
+            get
+            {
+                if (TotalCount == 0) return "Все пароли";
+                if (HasSearchText) return $"Найдено {FilteredCount} из {TotalCount}";
+                return $"Все пароли ({TotalCount})";
+            }
+        }
 
         public void Persist()
         {
@@ -181,12 +233,32 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
         {
             TotalCount = Rows.Count;
             OkCount = Rows.Count(r => r.Status == PasswordStatus.Ok);
-            WarningCount = Rows.Count(r => r.Status == PasswordStatus.Warning || r.Status == PasswordStatus.Urgent);
+            WarningCount = Rows.Count(r =>
+                r.Status == PasswordStatus.Warning ||
+                r.Status == PasswordStatus.Urgent ||
+                r.Status == PasswordStatus.Today);
             ExpiredCount = Rows.Count(r => r.Status == PasswordStatus.Expired);
             OnPropertyChanged(nameof(TotalCount));
             OnPropertyChanged(nameof(OkCount));
             OnPropertyChanged(nameof(WarningCount));
             OnPropertyChanged(nameof(ExpiredCount));
+            RefreshViewState();
+        }
+
+        private void RefreshViewState()
+        {
+            FilteredCount = Rows.Count(FilterRow);
+            OnPropertyChanged(nameof(FilteredCount));
+            OnPropertyChanged(nameof(ShowNoPasswordsState));
+            OnPropertyChanged(nameof(ShowNoSearchResultsState));
+            OnPropertyChanged(nameof(TableHeaderText));
+        }
+
+        private void ShowStatus(string message)
+        {
+            StatusMessage = message;
+            _statusTimer.Stop();
+            _statusTimer.Start();
         }
 
         private void AddPassword()
@@ -195,10 +267,14 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             if (dialog.ShowDialog() != true) return;
 
             var entry = dialog.Result;
+            var row = new PasswordRowViewModel(entry);
             Data.Entries.Add(entry);
-            Rows.Add(new PasswordRowViewModel(entry));
+            Rows.Add(row);
+            RowsView.Refresh();
+            Selected = row;
             Persist();
             RefreshStats();
+            ShowStatus($"Пароль «{entry.Title}» добавлен.");
         }
 
         private void EditPassword()
@@ -207,16 +283,18 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             var dialog = new PasswordEditWindow(Selected.Entry) { Owner = Application.Current.MainWindow };
             if (dialog.ShowDialog() != true) return;
             Selected.RefreshDerived();
+            RowsView.Refresh();
             Persist();
             RefreshStats();
-            RowsView.Refresh();
+            ShowStatus($"Запись «{Selected.Title}» обновлена.");
         }
 
         private void DeletePassword()
         {
             if (Selected == null) return;
+            var title = Selected.Title;
             var answer = MessageBox.Show(
-                "Удалить запись «" + Selected.Title + "»?",
+                "Удалить запись «" + title + "»?",
                 "Подтверждение",
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Question);
@@ -225,8 +303,10 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
             Data.Entries.Remove(Selected.Entry);
             Rows.Remove(Selected);
             Selected = null;
+            RowsView.Refresh();
             Persist();
             RefreshStats();
+            ShowStatus($"Запись «{title}» удалена.");
         }
 
         private void TogglePassword(PasswordRowViewModel row)
@@ -239,12 +319,14 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
         {
             if (row == null) return;
             _clipboard.CopyText(row.Login);
+            ShowStatus("Логин скопирован в буфер обмена.");
         }
 
         private void CopyPassword(PasswordRowViewModel row)
         {
             if (row == null) return;
             _clipboard.CopySensitive(row.Password, 30);
+            ShowStatus("Пароль скопирован (буфер очистится через 30 сек).");
         }
 
         private void OpenBackups()
@@ -266,7 +348,9 @@ namespace Avtokolonna1456.PasswordManager.ViewModels
                 }
                 DarkTheme = Data.DarkTheme;
                 AutostartEnabled = Data.AutostartEnabled;
+                RowsView.Refresh();
                 RefreshStats();
+                ShowStatus("Данные восстановлены из резервной копии.");
             })
             { Owner = Application.Current.MainWindow };
             window.ShowDialog();

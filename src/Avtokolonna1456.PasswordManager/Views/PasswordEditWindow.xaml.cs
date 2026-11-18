@@ -18,6 +18,7 @@ namespace Avtokolonna1456.PasswordManager.Views
 
             if (_isEdit)
             {
+                Title = "Редактировать пароль";
                 HeaderText.Text = "Редактировать пароль";
                 TitleBox.Text = existing.Title;
                 LoginBox.Text = existing.Login;
@@ -27,8 +28,12 @@ namespace Avtokolonna1456.PasswordManager.Views
             }
             else
             {
+                Title = "Добавить пароль";
+                HeaderText.Text = "Добавить пароль";
                 ChangedDatePicker.SelectedDate = DateTime.Today;
             }
+
+            Loaded += (s, e) => TitleBox.Focus();
         }
 
         public PasswordEntry Result { get; private set; }
@@ -41,17 +46,31 @@ namespace Avtokolonna1456.PasswordManager.Views
                 PasswordVisible.Text = PasswordHidden.Password;
                 PasswordVisible.Visibility = Visibility.Visible;
                 PasswordHidden.Visibility = Visibility.Collapsed;
+                TogglePasswordButton.Content = "Скрыть";
+                PasswordVisible.Focus();
+                PasswordVisible.CaretIndex = PasswordVisible.Text.Length;
             }
             else
             {
                 PasswordHidden.Password = PasswordVisible.Text;
                 PasswordHidden.Visibility = Visibility.Visible;
                 PasswordVisible.Visibility = Visibility.Collapsed;
+                TogglePasswordButton.Content = "Показать";
+                PasswordHidden.Focus();
             }
+        }
+
+        private void ShowError(string message, UIElement focusTarget)
+        {
+            ErrorText.Text = message;
+            ErrorText.Visibility = Visibility.Visible;
+            focusTarget?.Focus();
         }
 
         private void Save_Click(object sender, RoutedEventArgs e)
         {
+            ErrorText.Visibility = Visibility.Collapsed;
+
             var title = (TitleBox.Text ?? string.Empty).Trim();
             var login = (LoginBox.Text ?? string.Empty).Trim();
             var password = _passwordVisible ? PasswordVisible.Text : PasswordHidden.Password;
@@ -59,12 +78,12 @@ namespace Avtokolonna1456.PasswordManager.Views
 
             if (string.IsNullOrWhiteSpace(title))
             {
-                MessageBox.Show("Укажите название.", "Проверка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowError("Укажите название сервиса или ресурса.", TitleBox);
                 return;
             }
             if (string.IsNullOrWhiteSpace(password))
             {
-                MessageBox.Show("Укажите пароль.", "Проверка", MessageBoxButton.OK, MessageBoxImage.Warning);
+                ShowError("Укажите пароль.", _passwordVisible ? (UIElement)PasswordVisible : PasswordHidden);
                 return;
             }
 

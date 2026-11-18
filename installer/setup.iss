@@ -2,7 +2,7 @@
 ; Output: dist\Avtokolonna1456_Setup.exe
 
 #define MyAppName "Автоколонна 1456 — Менеджер паролей"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Автоколонна 1456"
 #define MyAppExeName "Avtokolonna1456.PasswordManager.exe"
 #define MyAppId "Avtokolonna1456.PasswordManager"
@@ -21,8 +21,8 @@ SetupIconFile=..\src\Avtokolonna1456.PasswordManager\Resources\app.ico
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
-ArchitecturesAllowed=x64
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 UninstallDisplayIcon={app}\{#MyAppExeName}
 

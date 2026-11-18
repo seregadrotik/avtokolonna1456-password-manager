@@ -74,7 +74,11 @@ namespace Avtokolonna1456.PasswordManager.Services
             var serializer = new DataContractJsonSerializer(typeof(AppData));
             using (var stream = new MemoryStream(bytes))
             {
-                return serializer.ReadObject(stream) as AppData;
+                var data = serializer.ReadObject(stream) as AppData ?? new AppData();
+                if (data.Entries == null) data.Entries = new System.Collections.Generic.List<PasswordEntry>();
+                if (data.Pin == null) data.Pin = new PinState();
+                if (data.NotificationLog == null) data.NotificationLog = new System.Collections.Generic.Dictionary<string, string>();
+                return data;
             }
         }
     }
