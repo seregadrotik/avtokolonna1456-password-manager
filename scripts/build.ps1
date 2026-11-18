@@ -20,7 +20,7 @@ if (-not (Test-Path $msbuild)) {
 }
 
 Write-Host "MSBuild: $msbuild"
-& $msbuild $sln /t:Restore,Build /p:Configuration=$Configuration /p:Platform=x64 /m
+& $msbuild $sln /t:Build /p:Configuration=$Configuration /p:Platform=x64 /m
 if ($LASTEXITCODE -ne 0) { throw "Сборка завершилась с ошибкой." }
 
 $out = Join-Path $root "src\Avtokolonna1456.PasswordManager\bin\x64\$Configuration"
