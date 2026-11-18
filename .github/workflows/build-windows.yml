@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Download project
@@ -29,3 +31,12 @@ jobs:
         with:
           name: Avtokolonna1456-Installer
           path: dist/Avtokolonna1456_Setup.exe
+
+      - name: Publish installer
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Автоколонна 1456 — последняя версия
+          prerelease: true
+          make_latest: true
+          files: dist/Avtokolonna1456_Setup.exe
